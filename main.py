@@ -9,32 +9,32 @@ from datetime import datetime
 
 app = FastAPI()
 
-# Mount static files
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Check if running on Vercel
+
 IS_VERCEL = os.getenv("VERCEL") == "1"
 
-# Import WebSocket only for localhost
+
 if not IS_VERCEL:
     from fastapi import WebSocket, WebSocketDisconnect
     import sqlite3
 
-# In-memory storage for Vercel (since serverless functions are stateless)
+
 vercel_rooms = {}
 vercel_players = {}
 vercel_games = {}
 
-# Database helper function (only for localhost)
+
 def get_db_connection():
     """Get database connection - file for localhost only"""
     if IS_VERCEL:
         raise Exception("Database not available on Vercel - using in-memory storage")
     else:
-        # For localhost, use file-based database
+
         return sqlite3.connect('game.db')
 
-# Initialize database (only for localhost)
+
 def init_db():
     if IS_VERCEL:
         print("Running on Vercel - skipping database initialization")
@@ -82,14 +82,14 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize database with error handling
+
 try:
     init_db()
     print("Database initialized successfully")
 except Exception as e:
     print(f"Error initializing database: {e}")
 
-# Clean up any orphaned players (only for localhost)
+
 def cleanup_orphaned_players():
     if IS_VERCEL:
         print("Running on Vercel - skipping cleanup")
@@ -98,13 +98,13 @@ def cleanup_orphaned_players():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Delete players from rooms that don't exist
+    
     cursor.execute('''
         DELETE FROM players 
         WHERE room_id NOT IN (SELECT id FROM rooms WHERE is_active = TRUE)
     ''')
     
-    # Update room player counts to match actual player counts
+    
     cursor.execute('''
         UPDATE rooms 
         SET current_players = (
@@ -118,13 +118,13 @@ def cleanup_orphaned_players():
     conn.close()
     print("Cleaned up orphaned players and updated room counts")
 
-# Run cleanup with error handling
+
 try:
     cleanup_orphaned_players()
 except Exception as e:
     print(f"Error during cleanup: {e}")
 
-# WebSocket connection manager (only for localhost)
+
 if not IS_VERCEL:
     class ConnectionManager:
         def __init__(self):
@@ -155,7 +155,7 @@ if not IS_VERCEL:
 
     manager = ConnectionManager()
 
-# Game logic
+
 class ConnectFourGame:
     def __init__(self):
         self.board = [[0 for _ in range(7)] for _ in range(6)]
@@ -167,19 +167,19 @@ class ConnectFourGame:
         if self.game_over:
             return False
         
-        # Find the lowest empty cell in the column
+        
         for row in range(5, -1, -1):
             if self.board[row][column] == 0:
                 self.board[row][column] = self.current_player
                 
-                # Check for win
+                
                 if self.check_win(row, column):
                     self.game_over = True
                     self.winner = self.current_player
                 elif self.is_board_full():
                     self.game_over = True
                 else:
-                    self.current_player = 3 - self.current_player  # Switch between 1 and 2
+                    self.current_player = 3 - self.current_player  
                 
                 return True
         return False
@@ -187,23 +187,23 @@ class ConnectFourGame:
     def check_win(self, row, col):
         player = self.board[row][col]
         
-        # Check horizontal
+        
         for c in range(max(0, col-3), min(4, col+1)):
             if all(self.board[row][c+i] == player for i in range(4)):
                 return True
         
-        # Check vertical
+        
         for r in range(max(0, row-3), min(3, row+1)):
             if all(self.board[r+i][col] == player for i in range(4)):
                 return True
         
-        # Check diagonal (top-left to bottom-right)
+        
         for r in range(max(0, row-3), min(3, row+1)):
             for c in range(max(0, col-3), min(4, col+1)):
                 if all(self.board[r+i][c+i] == player for i in range(4)):
                     return True
         
-        # Check diagonal (top-right to bottom-left)
+        
         for r in range(max(0, row-3), min(3, row+1)):
             for c in range(max(3, col), min(7, col+4)):
                 if all(self.board[r+i][c-i] == player for i in range(4)):
@@ -223,7 +223,7 @@ class ConnectFourGame:
         self.game_over = False
         self.winner = None
 
-# Store games in memory
+
 games: Dict[str, ConnectFourGame] = {}
 
 @app.get("/")
@@ -235,7 +235,7 @@ async def read_root():
         print(f"Error serving index.html: {e}")
         return HTMLResponse(content="<h1>Connect Four Game - Error loading page</h1><p>Please try refreshing the page.</p>", status_code=500)
 
-# Vercel-specific functions
+
 def create_room_vercel(name: str, password: str, username: str):
     """Create room using in-memory storage for Vercel"""
     room_id = str(uuid.uuid4())
@@ -259,7 +259,7 @@ def create_room_vercel(name: str, password: str, username: str):
         "joined_at": datetime.now().isoformat()
     }
     
-    # Initialize game for this room
+
     games[room_id] = ConnectFourGame()
     
     return {"room_id": room_id, "name": name, "password": password, "player_id": player_id, "success": True}
@@ -279,12 +279,12 @@ def join_room_vercel(room_id: str, username: str, password: str):
     if room["current_players"] >= room["max_players"]:
         raise HTTPException(status_code=400, detail="Room is full")
     
-    # Check if username is already taken
+
     for player in vercel_players.values():
         if player["room_id"] == room_id and player["username"] == username:
             raise HTTPException(status_code=400, detail="Username already taken")
     
-    # Add player to room
+
     player_id = str(uuid.uuid4())
     vercel_players[player_id] = {
         "id": player_id,
@@ -294,11 +294,11 @@ def join_room_vercel(room_id: str, username: str, password: str):
         "joined_at": datetime.now().isoformat()
     }
     
-    # Count actual players and update
+
     player_count = sum(1 for p in vercel_players.values() if p["room_id"] == room_id)
     vercel_rooms[room_id]["current_players"] = player_count
     
-    # Initialize game if not exists
+
     if room_id not in games:
         games[room_id] = ConnectFourGame()
     
@@ -332,7 +332,7 @@ def make_move_vercel(room_id: str, player_id: str, column: int):
     if player["room_id"] != room_id:
         raise HTTPException(status_code=400, detail="Player not in this room")
     
-    # Determine player number
+
     human_players = [p for p in vercel_players.values() if p["room_id"] == room_id and not p["is_computer"]]
     human_players.sort(key=lambda x: x["joined_at"])
     
@@ -345,15 +345,14 @@ def make_move_vercel(room_id: str, player_id: str, column: int):
     if player_number is None:
         raise HTTPException(status_code=400, detail="Player not found")
     
-    # Check if it's this player's turn
+
     if games[room_id].current_player != player_number:
         raise HTTPException(status_code=400, detail=f"It's not your turn! Current turn: {'Red Team' if games[room_id].current_player == 1 else 'Blue Team'}")
     
-    # Check if the move is valid
+
     if column < 0 or column >= 7 or games[room_id].board[0][column] != 0:
         raise HTTPException(status_code=400, detail="Invalid move! Column is full or out of bounds.")
-    
-    # Make the move
+
     if games[room_id].make_move(column):
         return {"success": True}
     else:
@@ -372,12 +371,12 @@ def add_computer_opponent_vercel(room_id: str):
     if room_id not in vercel_rooms:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Check if computer player already exists
+
     for player in vercel_players.values():
         if player["room_id"] == room_id and player["is_computer"]:
             raise HTTPException(status_code=400, detail="Computer opponent already exists")
     
-    # Add computer player
+
     computer_id = str(uuid.uuid4())
     vercel_players[computer_id] = {
         "id": computer_id,
@@ -387,19 +386,19 @@ def add_computer_opponent_vercel(room_id: str):
         "joined_at": datetime.now().isoformat()
     }
     
-    # Update player count
+
     player_count = sum(1 for p in vercel_players.values() if p["room_id"] == room_id)
     vercel_rooms[room_id]["current_players"] = player_count
     
     return {"success": True}
 
-# API endpoints
+
 @app.post("/create-room")
 async def create_room(name: str = Form(...), password: str = Form(None), username: str = Form(...)):
     if IS_VERCEL:
         return create_room_vercel(name, password or "", username)
     
-    # Localhost version with SQLite
+
     room_id = str(uuid.uuid4())
     player_id = str(uuid.uuid4())
     
@@ -416,7 +415,7 @@ async def create_room(name: str = Form(...), password: str = Form(None), usernam
         VALUES (?, ?, ?, FALSE)
     ''', (player_id, username, room_id))
     
-    # Initialize game for this room
+
     games[room_id] = ConnectFourGame()
     
     conn.commit()
@@ -429,11 +428,11 @@ async def join_room(room_id: str = Form(...), username: str = Form(...), passwor
     if IS_VERCEL:
         return join_room_vercel(room_id, username, password or "")
     
-    # Localhost version with SQLite
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Check if room exists and password is correct
+
     cursor.execute('SELECT * FROM rooms WHERE id = ? AND is_active = TRUE', (room_id,))
     room = cursor.fetchone()
     
@@ -445,27 +444,27 @@ async def join_room(room_id: str = Form(...), username: str = Form(...), passwor
         conn.close()
         raise HTTPException(status_code=401, detail="Incorrect password")
     
-    # Check if room is full
+
     current_players = room[5] if room[5] is not None else 0
     max_players = room[4] if room[4] is not None else 2
     if current_players >= max_players:
         conn.close()
         raise HTTPException(status_code=400, detail="Room is full")
     
-    # Check if username is already taken
+
     cursor.execute('SELECT * FROM players WHERE room_id = ? AND username = ?', (room_id, username))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Username already taken")
     
-    # Add player to room
+
     player_id = str(uuid.uuid4())
     cursor.execute('''
         INSERT INTO players (id, username, room_id, is_computer)
         VALUES (?, ?, ?, FALSE)
     ''', (player_id, username, room_id))
     
-    # Count actual players in the room and update
+
     cursor.execute('SELECT COUNT(*) FROM players WHERE room_id = ?', (room_id,))
     actual_player_count = cursor.fetchone()[0]
     
@@ -474,7 +473,7 @@ async def join_room(room_id: str = Form(...), username: str = Form(...), passwor
         WHERE id = ?
     ''', (actual_player_count, room_id))
     
-    # Initialize game if not exists
+
     if room_id not in games:
         games[room_id] = ConnectFourGame()
     
@@ -486,16 +485,16 @@ async def join_room(room_id: str = Form(...), username: str = Form(...), passwor
 @app.post("/join-vs-computer")
 async def join_vs_computer(room_id: str = Form(...), username: str = Form(...), password: str = Form(None)):
     if IS_VERCEL:
-        # For Vercel, just join the room and add computer opponent
+
         result = join_room_vercel(room_id, username, password or "")
         add_computer_opponent_vercel(room_id)
         return result
     
-    # Localhost version with SQLite
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Check if room exists and password is correct
+
     cursor.execute('SELECT * FROM rooms WHERE id = ? AND is_active = TRUE', (room_id,))
     room = cursor.fetchone()
     
@@ -507,34 +506,34 @@ async def join_vs_computer(room_id: str = Form(...), username: str = Form(...), 
         conn.close()
         raise HTTPException(status_code=401, detail="Incorrect password")
     
-    # Check if room is full
+
     current_players = room[5] if room[5] is not None else 0
     max_players = room[4] if room[4] is not None else 2
     if current_players >= max_players:
         conn.close()
         raise HTTPException(status_code=400, detail="Room is full")
     
-    # Check if username is already taken
+
     cursor.execute('SELECT * FROM players WHERE room_id = ? AND username = ?', (room_id, username))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Username already taken")
     
-    # Add human player to room
+
     player_id = str(uuid.uuid4())
     cursor.execute('''
         INSERT INTO players (id, username, room_id, is_computer)
         VALUES (?, ?, ?, FALSE)
     ''', (player_id, username, room_id))
     
-    # Add computer player
+
     computer_id = str(uuid.uuid4())
     cursor.execute('''
         INSERT INTO players (id, username, room_id, is_computer)
         VALUES (?, ?, ?, TRUE)
     ''', (computer_id, "Computer", room_id))
     
-    # Count actual players in the room and update
+
     cursor.execute('SELECT COUNT(*) FROM players WHERE room_id = ?', (room_id,))
     actual_player_count = cursor.fetchone()[0]
     
@@ -543,7 +542,7 @@ async def join_vs_computer(room_id: str = Form(...), username: str = Form(...), 
         WHERE id = ?
     ''', (actual_player_count, room_id))
     
-    # Initialize game if not exists
+
     if room_id not in games:
         games[room_id] = ConnectFourGame()
     
@@ -557,7 +556,7 @@ async def get_room_info(room_id: str):
     if IS_VERCEL:
         return get_room_info_vercel(room_id)
     
-    # Localhost version with SQLite
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -598,7 +597,7 @@ async def make_move(room_id: str = Form(...), player_id: str = Form(...), column
     if IS_VERCEL:
         return make_move_vercel(room_id, player_id, column)
     
-    # Localhost version with SQLite
+
     if room_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
     
@@ -613,7 +612,7 @@ async def make_move(room_id: str = Form(...), player_id: str = Form(...), column
     
     username, is_computer = player_info
     
-    # Determine player number
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -633,11 +632,11 @@ async def make_move(room_id: str = Form(...), player_id: str = Form(...), column
     if player_number is None:
         raise HTTPException(status_code=400, detail="Player not found")
     
-    # Check if it's this player's turn
+
     if games[room_id].current_player != player_number:
         raise HTTPException(status_code=400, detail=f"It's not your turn! Current turn: {'Red Team' if games[room_id].current_player == 1 else 'Blue Team'}")
     
-    # Check if the move is valid
+
     if column < 0 or column >= 7 or games[room_id].board[0][column] != 0:
         raise HTTPException(status_code=400, detail="Invalid move! Column is full or out of bounds.")
     
@@ -652,7 +651,7 @@ async def reset_game(room_id: str = Form(...)):
     if IS_VERCEL:
         return reset_game_vercel(room_id)
     
-    # Localhost version with SQLite
+
     if room_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
     
@@ -664,11 +663,11 @@ async def add_computer_opponent(room_id: str = Form(...)):
     if IS_VERCEL:
         return add_computer_opponent_vercel(room_id)
     
-    # Localhost version with SQLite
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Check if room exists
+
     cursor.execute('SELECT * FROM rooms WHERE id = ? AND is_active = TRUE', (room_id,))
     room = cursor.fetchone()
     
@@ -676,20 +675,20 @@ async def add_computer_opponent(room_id: str = Form(...)):
         conn.close()
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Check if computer player already exists
+
     cursor.execute('SELECT * FROM players WHERE room_id = ? AND is_computer = TRUE', (room_id,))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Computer opponent already exists")
     
-    # Add computer player
+
     computer_id = str(uuid.uuid4())
     cursor.execute('''
         INSERT INTO players (id, username, room_id, is_computer)
         VALUES (?, ?, ?, TRUE)
     ''', (computer_id, "Computer", room_id))
     
-    # Count actual players in the room and update
+
     cursor.execute('SELECT COUNT(*) FROM players WHERE room_id = ?', (room_id,))
     actual_player_count = cursor.fetchone()[0]
     
@@ -707,13 +706,13 @@ async def add_computer_opponent(room_id: str = Form(...)):
 async def reset_database():
     """Reset database for testing purposes"""
     if IS_VERCEL:
-        # Clear in-memory storage
+
         vercel_rooms.clear()
         vercel_players.clear()
         games.clear()
         return {"success": True, "message": "Vercel in-memory storage cleared"}
     
-    # Localhost version with SQLite
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -724,19 +723,19 @@ async def reset_database():
     conn.commit()
     conn.close()
     
-    # Clear in-memory games
+
     games.clear()
     
     return {"success": True, "message": "Database reset successfully"}
 
-# WebSocket endpoint (only for localhost)
+
 if not IS_VERCEL:
     @app.websocket("/ws/{room_id}/{player_id}")
     async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
         await manager.connect(websocket, room_id)
         
         try:
-            # Get player info from database
+
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('SELECT username, is_computer FROM players WHERE id = ?', (player_id,))
@@ -749,11 +748,11 @@ if not IS_VERCEL:
             
             username, is_computer = player_info
             
-            # Initialize game if not exists
+
             if room_id not in games:
                 games[room_id] = ConnectFourGame()
             
-            # Determine player number (1 for first human player, 2 for second human player)
+            
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('''
@@ -767,10 +766,10 @@ if not IS_VERCEL:
             player_number = None
             for i, (pid,) in enumerate(human_players):
                 if pid == player_id:
-                    player_number = i + 1  # 1 for first player, 2 for second player
+                    player_number = i + 1  
                     break
             
-            # Send current game state with player info
+            
             game_state = {
                 "type": "game_state",
                 "board": games[room_id].get_board_state(),
@@ -789,9 +788,9 @@ if not IS_VERCEL:
                 if message["type"] == "make_move":
                     column = message["column"]
                     
-                    # Check if it's this player's turn
+                    
                     if games[room_id].current_player != player_number:
-                        # Send error message to this player only
+                        
                         error_message = {
                             "type": "error",
                             "message": f"It's not your turn! Current turn: {'Red Team' if games[room_id].current_player == 1 else 'Blue Team'}"
@@ -799,7 +798,7 @@ if not IS_VERCEL:
                         await websocket.send_text(json.dumps(error_message))
                         continue
                     
-                    # Check if the move is valid
+                    
                     if column < 0 or column >= 7 or games[room_id].board[0][column] != 0:
                         error_message = {
                             "type": "error",
@@ -808,9 +807,9 @@ if not IS_VERCEL:
                         await websocket.send_text(json.dumps(error_message))
                         continue
                     
-                    # Make the move
+                   
                     if games[room_id].make_move(column):
-                        # Broadcast updated game state
+                        
                         game_state = {
                             "type": "game_state",
                             "board": games[room_id].get_board_state(),
@@ -820,7 +819,7 @@ if not IS_VERCEL:
                         }
                         await manager.broadcast_to_room(json.dumps(game_state), room_id)
                         
-                        # Only make computer moves if there's actually a computer player
+                       
                         if not games[room_id].game_over and games[room_id].current_player == 2:
                             conn = get_db_connection()
                             cursor = conn.cursor()
@@ -829,14 +828,14 @@ if not IS_VERCEL:
                             conn.close()
                             
                             if computer_count > 0:
-                                # Simple AI: make a random valid move
+                                
                                 import random
                                 valid_moves = [col for col in range(7) if games[room_id].board[0][col] == 0]
                                 if valid_moves:
                                     ai_column = random.choice(valid_moves)
                                     games[room_id].make_move(ai_column)
                                     
-                                    # Broadcast AI move
+                                    
                                     game_state = {
                                         "type": "game_state",
                                         "board": games[room_id].get_board_state(),
