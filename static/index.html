@@ -328,13 +328,17 @@
     </div>
 
     <script>
-                 let currentRoomId = null;
-         let currentPlayerId = null;
-         let currentUsername = null;
-         let websocket = null;
-         let gameBoard = null;
-         let currentPlayer = 1;
-         let myPlayerNumber = null;
+        let currentRoomId = null;
+        let currentPlayerId = null;
+        let currentUsername = null;
+        let gameBoard = null;
+        let currentPlayer = 1;
+        let myPlayerNumber = null;
+        let websocket = null;
+        let pollingInterval = null;
+
+        // Detect if running on Vercel (has .vercel.app in URL)
+        const isVercel = window.location.hostname.includes('vercel.app');
 
         function showMessage(message, type = 'success') {
             const messageArea = document.getElementById('messageArea');
@@ -378,6 +382,7 @@
                     currentRoomId = data.room_id;
                     currentPlayerId = data.player_id;
                     currentUsername = username;
+                    myPlayerNumber = 1; // Creator is always player 1
                     await initializeGame();
                     showMessage(`Room created successfully! Room ID: ${data.room_id}`, 'success');
                 } else {
@@ -414,6 +419,7 @@
                     currentRoomId = data.room_id;
                     currentPlayerId = data.player_id;
                     currentUsername = username;
+                    myPlayerNumber = 2; // Joiner is always player 2
                     await initializeGame();
                 } else {
                     const errorMessage = data.detail || data.message || 'Failed to join room';
@@ -449,6 +455,7 @@
                     currentRoomId = data.room_id;
                     currentPlayerId = data.player_id;
                     currentUsername = username;
+                    myPlayerNumber = 1; // Human player is always player 1 vs computer
                     await initializeGame();
                 } else {
                     const errorMessage = data.detail || data.message || 'Failed to join room';
@@ -462,8 +469,15 @@
         async function initializeGame() {
             showSection('game');
             await loadRoomInfo();
-            initializeWebSocket();
             initializeGameBoard();
+            
+            if (isVercel) {
+                startPolling();
+                console.log('Running in Vercel mode (polling)');
+            } else {
+                initializeWebSocket();
+                console.log('Running in localhost mode (WebSocket)');
+            }
         }
 
         async function loadRoomInfo() {
@@ -495,6 +509,7 @@
             }
         }
 
+        // WebSocket functions (for localhost)
         function initializeWebSocket() {
             const wsUrl = `ws://${window.location.host}/ws/${currentRoomId}/${currentPlayerId}`;
             websocket = new WebSocket(wsUrl);
@@ -537,6 +552,37 @@
             }
         }
 
+        // Polling functions (for Vercel)
+        function startPolling() {
+            // Poll for game state updates every 1 second
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/game-state/${currentRoomId}`);
+                    const gameState = await response.json();
+                    
+                    updateGameBoard(gameState.board);
+                    updateGameStatus(gameState);
+                    currentPlayer = gameState.current_player;
+                    
+                    // Update player info
+                    updatePlayerInfo(myPlayerNumber, currentUsername);
+                    
+                    // Update board interactivity based on whose turn it is
+                    updateBoardInteractivity(gameState.current_player);
+                    
+                } catch (error) {
+                    console.error('Error polling game state:', error);
+                }
+            }, 1000);
+        }
+
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
         function updateBoardInteractivity(currentPlayerTurn) {
             if (!gameBoard) return;
             
@@ -563,7 +609,7 @@
         }
 
         function updatePlayerInfo(playerNumber, username) {
-            const teamColor = playerNumber === 1 ? '🔴 Red Team' : '🔵 Blue Team';
+            const teamColor = playerNumber === 1 ? 'Red Team' : 'Blue Team';
             const statusElement = document.getElementById('gameStatus');
             if (statusElement && !statusElement.textContent.includes('wins') && !statusElement.textContent.includes('draw')) {
                 statusElement.textContent = `You are ${teamColor} (${username})`;
@@ -594,10 +640,10 @@
                     
                     if (board[row][col] === 1) {
                         cell.classList.add('player1');
-                        cell.textContent = '🔴';
+                        cell.textContent = 'R';
                     } else if (board[row][col] === 2) {
                         cell.classList.add('player2');
-                        cell.textContent = '🔵';
+                        cell.textContent = 'B';
                     } else {
                         cell.textContent = '';
                     }
@@ -610,7 +656,7 @@
             
             if (gameState.game_over) {
                 if (gameState.winner) {
-                    const winnerTeam = gameState.winner === 1 ? '🔴 Red Team' : '🔵 Blue Team';
+                    const winnerTeam = gameState.winner === 1 ? 'Red Team' : 'Blue Team';
                     statusElement.textContent = `${winnerTeam} wins!`;
                     statusElement.className = 'status winner';
                 } else {
@@ -618,13 +664,47 @@
                     statusElement.className = 'status draw';
                 }
             } else {
-                const currentTeam = gameState.current_player === 1 ? '🔴 Red Team' : '🔵 Blue Team';
+                const currentTeam = gameState.current_player === 1 ? 'Red Team' : 'Blue Team';
                 statusElement.textContent = `Current turn: ${currentTeam}`;
                 statusElement.className = 'status';
             }
         }
 
         function makeMove(column) {
+            if (isVercel) {
+                // Use polling mode for Vercel
+                makeMovePolling(column);
+            } else {
+                // Use WebSocket mode for localhost
+                makeMoveWebSocket(column);
+            }
+        }
+
+        async function makeMovePolling(column) {
+            try {
+                const response = await fetch('/make-move', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `room_id=${encodeURIComponent(currentRoomId)}&player_id=${encodeURIComponent(currentPlayerId)}&column=${column}`
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Move was successful, the polling will update the board
+                    console.log('Move successful');
+                } else {
+                    const errorMessage = data.detail || data.message || 'Failed to make move';
+                    showMessage(errorMessage, 'error');
+                }
+            } catch (error) {
+                showMessage('Error making move: ' + error.message, 'error');
+            }
+        }
+
+        function makeMoveWebSocket(column) {
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 const message = {
                     type: 'make_move',
@@ -635,6 +715,37 @@
         }
 
         function resetGame() {
+            if (isVercel) {
+                resetGamePolling();
+            } else {
+                resetGameWebSocket();
+            }
+        }
+
+        async function resetGamePolling() {
+            try {
+                const response = await fetch('/reset-game', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `room_id=${encodeURIComponent(currentRoomId)}`
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Game reset successfully!', 'success');
+                } else {
+                    const errorMessage = data.detail || data.message || 'Failed to reset game';
+                    showMessage(errorMessage, 'error');
+                }
+            } catch (error) {
+                showMessage('Error resetting game: ' + error.message, 'error');
+            }
+        }
+
+        function resetGameWebSocket() {
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 const message = {
                     type: 'reset_game'
@@ -674,14 +785,18 @@
         }
 
         function leaveRoom() {
-            if (websocket) {
-                websocket.close();
+            if (isVercel) {
+                stopPolling();
+            } else {
+                if (websocket) {
+                    websocket.close();
+                }
             }
             
-                         currentRoomId = null;
-             currentPlayerId = null;
-             currentUsername = null;
-             myPlayerNumber = null;
+            currentRoomId = null;
+            currentPlayerId = null;
+            currentUsername = null;
+            myPlayerNumber = null;
             
             showSection('lobby');
             document.getElementById('joinRoomId').value = '';
