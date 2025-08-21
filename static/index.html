@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Four - Multiplayer Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .game-section {
+            display: none;
+        }
+
+        .lobby-section {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #495057);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            background: #1e3a8a;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .cell.player1 {
+            background: #ef4444;
+            color: white;
+        }
+
+        .cell.player2 {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .game-info {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .game-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        .status.winner {
+            color: #28a745;
+        }
+
+        .status.draw {
+            color: #6c757d;
+        }
+
+        .room-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .room-info h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .player-list {
+            list-style: none;
+        }
+
+        .player-list li {
+            padding: 5px 0;
+            color: #333;
+        }
+
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            color: #155724;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .cell {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+            
+            .game-board {
+                padding: 15px;
+                gap: 3px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Connect Four</h1>
+            <p>Play with friends or challenge the computer!</p>
+        </div>
+
+        <!-- Lobby Section -->
+        <div class="lobby-section" id="lobbySection">
+            <div class="form-group">
+                <label for="roomName">Room Name:</label>
+                <input type="text" id="roomName" placeholder="Enter room name">
+            </div>
+            
+            <div class="form-group">
+                <label for="creatorUsername">Your Username:</label>
+                <input type="text" id="creatorUsername" placeholder="Enter your username">
+            </div>
+            
+            <div class="form-group">
+                <label for="roomPassword">Password (optional):</label>
+                <input type="password" id="roomPassword" placeholder="Enter password if you want to protect the room">
+            </div>
+            
+            <button class="btn" onclick="createRoom()">Create Room</button>
+            
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e1e5e9;">
+            
+            <h3 style="text-align: center; margin-bottom: 20px;">Join Existing Room</h3>
+            
+            <div class="form-group">
+                <label for="joinRoomId">Room ID:</label>
+                <input type="text" id="joinRoomId" placeholder="Enter room ID">
+            </div>
+            
+            <div class="form-group">
+                <label for="joinUsername">Username:</label>
+                <input type="text" id="joinUsername" placeholder="Enter your username">
+            </div>
+            
+            <div class="form-group">
+                <label for="joinPassword">Password (if required):</label>
+                <input type="password" id="joinPassword" placeholder="Enter room password">
+            </div>
+            
+            <button class="btn btn-success" onclick="joinRoom()">Join Room</button>
+            <button class="btn btn-secondary" onclick="joinVsComputer()">Play vs Computer</button>
+        </div>
+
+        <!-- Game Section -->
+        <div class="game-section" id="gameSection">
+            <div class="room-info" id="roomInfo">
+                <h4>Room Information</h4>
+                <div id="roomDetails"></div>
+            </div>
+            
+            <div class="game-info">
+                <h3>Game Status</h3>
+                <div class="status" id="gameStatus">Waiting for players...</div>
+            </div>
+            
+            <div class="game-board" id="gameBoard"></div>
+            
+            <div style="text-align: center;">
+                <button class="btn btn-secondary" onclick="resetGame()">Reset Game</button>
+                <button class="btn btn-danger" onclick="leaveRoom()">Leave Room</button>
+            </div>
+            
+            <!-- Waiting for opponent section -->
+            <div id="waitingSection" style="text-align: center; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                <h4>Waiting for opponent...</h4>
+                <p>Share this Room ID with a friend: <strong id="shareRoomId"></strong></p>
+                <button class="btn btn-success" onclick="addComputerOpponent()">Play vs Computer</button>
+                <button class="btn btn-secondary" onclick="refreshRoomInfo()">Refresh</button>
+            </div>
+        </div>
+
+        <div id="messageArea"></div>
+    </div>
+
+    <script>
+                 let currentRoomId = null;
+         let currentPlayerId = null;
+         let currentUsername = null;
+         let websocket = null;
+         let gameBoard = null;
+         let currentPlayer = 1;
+         let myPlayerNumber = null;
+
+        function showMessage(message, type = 'success') {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+
+        function showSection(sectionName) {
+            document.getElementById('lobbySection').style.display = 'none';
+            document.getElementById('gameSection').style.display = 'none';
+            document.getElementById(sectionName + 'Section').style.display = 'block';
+        }
+
+        async function createRoom() {
+            const roomName = document.getElementById('roomName').value.trim();
+            const username = document.getElementById('creatorUsername').value.trim();
+            const password = document.getElementById('roomPassword').value.trim();
+            
+            if (!roomName || !username) {
+                showMessage('Please enter both room name and username', 'error');
+                return;
+            }
+            
+            try {
+                console.log('Creating room with:', { roomName, username, password });
+                const response = await fetch('/create-room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `name=${encodeURIComponent(roomName)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok) {
+                    currentRoomId = data.room_id;
+                    currentPlayerId = data.player_id;
+                    currentUsername = username;
+                    await initializeGame();
+                    showMessage(`Room created successfully! Room ID: ${data.room_id}`, 'success');
+                } else {
+                    const errorMessage = data.detail || data.message || 'Failed to create room';
+                    showMessage(errorMessage, 'error');
+                }
+            } catch (error) {
+                showMessage('Error creating room: ' + error.message, 'error');
+            }
+        }
+
+        async function joinRoom() {
+            const roomId = document.getElementById('joinRoomId').value.trim();
+            const username = document.getElementById('joinUsername').value.trim();
+            const password = document.getElementById('joinPassword').value.trim();
+            
+            if (!roomId || !username) {
+                showMessage('Please enter both room ID and username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/join-room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `room_id=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentRoomId = data.room_id;
+                    currentPlayerId = data.player_id;
+                    currentUsername = username;
+                    await initializeGame();
+                } else {
+                    const errorMessage = data.detail || data.message || 'Failed to join room';
+                    showMessage(errorMessage, 'error');
+                }
+            } catch (error) {
+                showMessage('Error joining room: ' + error.message, 'error');
+            }
+        }
+
+        async function joinVsComputer() {
+            const roomId = document.getElementById('joinRoomId').value.trim();
+            const username = document.getElementById('joinUsername').value.trim();
+            const password = document.getElementById('joinPassword').value.trim();
+            
+            if (!roomId || !username) {
+                showMessage('Please enter both room ID and username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/join-vs-computer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `room_id=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentRoomId = data.room_id;
+                    currentPlayerId = data.player_id;
+                    currentUsername = username;
+                    await initializeGame();
+                } else {
+                    const errorMessage = data.detail || data.message || 'Failed to join room';
+                    showMessage(errorMessage, 'error');
+                }
+            } catch (error) {
+                showMessage('Error joining room: ' + error.message, 'error');
+            }
+        }
+
+        async function initializeGame() {
+            showSection('game');
+            await loadRoomInfo();
+            initializeWebSocket();
+            initializeGameBoard();
+        }
+
+        async function loadRoomInfo() {
+            try {
+                const response = await fetch(`/room-info/${currentRoomId}`);
+                const data = await response.json();
+                
+                const roomDetails = document.getElementById('roomDetails');
+                roomDetails.innerHTML = `
+                    <p><strong>Room:</strong> ${data.name}</p>
+                    <p><strong>Players:</strong> ${data.current_players}/${data.max_players}</p>
+                    <ul class="player-list">
+                        ${data.players.map(p => `<li>${p.username}${p.is_computer ? ' (Computer)' : ''}</li>`).join('')}
+                    </ul>
+                `;
+                
+                // Update share room ID
+                document.getElementById('shareRoomId').textContent = currentRoomId;
+                
+                // Show/hide waiting section based on player count
+                const waitingSection = document.getElementById('waitingSection');
+                if (data.current_players < 2) {
+                    waitingSection.style.display = 'block';
+                } else {
+                    waitingSection.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading room info:', error);
+            }
+        }
+
+        function initializeWebSocket() {
+            const wsUrl = `ws://${window.location.host}/ws/${currentRoomId}/${currentPlayerId}`;
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function(event) {
+                console.log('WebSocket connected');
+            };
+            
+            websocket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                handleGameMessage(message);
+            };
+            
+            websocket.onclose = function(event) {
+                console.log('WebSocket disconnected');
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleGameMessage(message) {
+            if (message.type === 'game_state') {
+                updateGameBoard(message.board);
+                updateGameStatus(message);
+                currentPlayer = message.current_player;
+                
+                // Update player info if available
+                if (message.player_number && message.username) {
+                    console.log(`You are Player ${message.player_number} (${message.username})`);
+                    myPlayerNumber = message.player_number;
+                    updatePlayerInfo(message.player_number, message.username);
+                }
+                
+                // Update board interactivity based on whose turn it is
+                updateBoardInteractivity(message.current_player);
+            } else if (message.type === 'error') {
+                showMessage(message.message, 'error');
+            }
+        }
+
+        function updateBoardInteractivity(currentPlayerTurn) {
+            if (!gameBoard) return;
+            
+            const cells = gameBoard.children;
+            for (let i = 0; i < cells.length; i++) {
+                const cell = cells[i];
+                const col = i % 7;
+                
+                // Check if this column is full by looking at the top row
+                const topRowCell = gameBoard.children[col];
+                const isColumnFull = topRowCell.textContent !== '';
+                
+                // Only allow clicks if it's this player's turn and the column is not full
+                const isPlayerTurn = currentPlayerTurn === myPlayerNumber;
+                
+                if (isPlayerTurn && !isColumnFull) {
+                    cell.style.cursor = 'pointer';
+                    cell.style.opacity = '1';
+                } else {
+                    cell.style.cursor = 'not-allowed';
+                    cell.style.opacity = '0.6';
+                }
+            }
+        }
+
+        function updatePlayerInfo(playerNumber, username) {
+            const teamColor = playerNumber === 1 ? '🔴 Red Team' : '🔵 Blue Team';
+            const statusElement = document.getElementById('gameStatus');
+            if (statusElement && !statusElement.textContent.includes('wins') && !statusElement.textContent.includes('draw')) {
+                statusElement.textContent = `You are ${teamColor} (${username})`;
+            }
+        }
+
+        function initializeGameBoard() {
+            gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '';
+            
+            for (let row = 0; row < 6; row++) {
+                for (let col = 0; col < 7; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.onclick = () => makeMove(col);
+                    gameBoard.appendChild(cell);
+                }
+            }
+        }
+
+        function updateGameBoard(board) {
+            for (let row = 0; row < 6; row++) {
+                for (let col = 0; col < 7; col++) {
+                    const cell = gameBoard.children[row * 7 + col];
+                    cell.className = 'cell';
+                    
+                    if (board[row][col] === 1) {
+                        cell.classList.add('player1');
+                        cell.textContent = '🔴';
+                    } else if (board[row][col] === 2) {
+                        cell.classList.add('player2');
+                        cell.textContent = '🔵';
+                    } else {
+                        cell.textContent = '';
+                    }
+                }
+            }
+        }
+
+        function updateGameStatus(gameState) {
+            const statusElement = document.getElementById('gameStatus');
+            
+            if (gameState.game_over) {
+                if (gameState.winner) {
+                    const winnerTeam = gameState.winner === 1 ? '🔴 Red Team' : '🔵 Blue Team';
+                    statusElement.textContent = `${winnerTeam} wins!`;
+                    statusElement.className = 'status winner';
+                } else {
+                    statusElement.textContent = "It's a draw!";
+                    statusElement.className = 'status draw';
+                }
+            } else {
+                const currentTeam = gameState.current_player === 1 ? '🔴 Red Team' : '🔵 Blue Team';
+                statusElement.textContent = `Current turn: ${currentTeam}`;
+                statusElement.className = 'status';
+            }
+        }
+
+        function makeMove(column) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                const message = {
+                    type: 'make_move',
+                    column: column
+                };
+                websocket.send(JSON.stringify(message));
+            }
+        }
+
+        function resetGame() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                const message = {
+                    type: 'reset_game'
+                };
+                websocket.send(JSON.stringify(message));
+            }
+        }
+
+        async function addComputerOpponent() {
+            try {
+                const response = await fetch('/add-computer-opponent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `room_id=${encodeURIComponent(currentRoomId)}`
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Computer opponent added! Game starting...', 'success');
+                    await loadRoomInfo();
+                    // Hide waiting section when game starts
+                    document.getElementById('waitingSection').style.display = 'none';
+                } else {
+                    const errorMessage = data.detail || data.message || 'Failed to add computer opponent';
+                    showMessage(errorMessage, 'error');
+                }
+            } catch (error) {
+                showMessage('Error adding computer opponent: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshRoomInfo() {
+            await loadRoomInfo();
+        }
+
+        function leaveRoom() {
+            if (websocket) {
+                websocket.close();
+            }
+            
+                         currentRoomId = null;
+             currentPlayerId = null;
+             currentUsername = null;
+             myPlayerNumber = null;
+            
+            showSection('lobby');
+            document.getElementById('joinRoomId').value = '';
+            document.getElementById('joinUsername').value = '';
+            document.getElementById('joinPassword').value = '';
+            document.getElementById('roomName').value = '';
+            document.getElementById('creatorUsername').value = '';
+            document.getElementById('roomPassword').value = '';
+        }
+    </script>
+</body>
+</html>
