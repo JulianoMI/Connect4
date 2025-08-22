@@ -6,7 +6,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/JulianoMI/Connect4.git
    cd TwoPlayer
    ```
 
